@@ -68,7 +68,7 @@ curl -i -X POST http://127.0.0.1:8010/api/caption-cuts \
 
 ## 配置与启动
 
-服务只读取本项目 `.env`，不再依赖同级目录。`.env.example` 包含服务地址、日志、OSS、Ark、重试和输入限制等全部配置；
+服务只读取本项目 `.env`，不再依赖同级目录。`.env.example` 包含服务地址、日志、OSS 和 Ark 等部署环境配置；
 真实 `.env` 已写入本项目并由 Git 忽略，部署时也可以通过系统环境变量覆盖。
 
 ```bash

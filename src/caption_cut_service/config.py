@@ -43,10 +43,6 @@ _ENV_NAMES = {
     "ARK_MODEL",
     "GLOBAL_TIMEOUT_SECONDS",
     "GLOBAL_RETRY_ATTEMPTS",
-    "OSS_RETRY_ATTEMPTS",
-    "OSS_CONNECT_TIMEOUT_SECONDS",
-    "MAX_CAPTION_BYTES",
-    "MAX_CAPTION_CANDIDATES",
 }
 
 
@@ -138,10 +134,6 @@ def get_settings() -> Settings:
         ark_model=os.environ.get("ARK_MODEL", ARK_MODEL),
         global_timeout_seconds=_env_int("GLOBAL_TIMEOUT_SECONDS", GLOBAL_TIMEOUT_SECONDS),
         global_retry_attempts=_env_int("GLOBAL_RETRY_ATTEMPTS", GLOBAL_RETRY_ATTEMPTS),
-        oss_retry_attempts=_env_int("OSS_RETRY_ATTEMPTS", OSS_RETRY_ATTEMPTS),
-        oss_connect_timeout_seconds=_env_int("OSS_CONNECT_TIMEOUT_SECONDS", OSS_CONNECT_TIMEOUT_SECONDS),
-        max_caption_bytes=_env_int("MAX_CAPTION_BYTES", MAX_CAPTION_BYTES),
-        max_caption_candidates=_env_int("MAX_CAPTION_CANDIDATES", MAX_CAPTION_CANDIDATES),
         log_level=os.environ.get("CAPTION_CUT_LOG_LEVEL", LOG_LEVEL).upper(),
         log_dir=_env_path("CAPTION_CUT_LOG_DIR", data_dir / "logs"),
     )
