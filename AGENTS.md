@@ -13,8 +13,8 @@
 ## Caption 规则
 
 - 外部帧范围为 `[start_frame, end_frame)`，与 Caption 的 1 FPS 时间轴直接对应，不探测源视频 FPS。
-- segment 采用区间相交规则；输出范围前扩到首段起点、后扩到末段终点。
-- 输出 segments 保留源字段，只把时间重置到首段从 0 秒开始。
+- 起点和终点在距离唯一最近 segment 边界不超过 1.5 秒时吸附；与两个边界等距时保持原值，不固定前扩或后扩。
+- 超过吸附阈值时保留请求边界，首尾 segment 裁剪到实际范围，并把时间轴按实际起点重置。
 - Global 只重新生成 `task.command`、`task.step` 和可选 `task.outcome`；`scene`、`task.domain/type` 保留源值。
 - 最终 OSS JSON 只包含 `scene`、`task`、`segments`，来源与切分范围只保存在同步接口响应中。
 

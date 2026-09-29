@@ -12,7 +12,7 @@ from typing import Any, Protocol
 
 import requests
 
-from caption_cut_service.config import Settings
+from caption_cut_service.config import SEGMENT_BOUNDARY_SNAP_SECONDS, Settings
 from caption_cut_service.schemas import CaptionCutRequest, CaptionCutResult
 from caption_cut_service.storage import OssStorage
 
@@ -144,36 +144,54 @@ def _segment_times(segment: Any, index: int) -> tuple[float, float]:
     return start, end
 
 
+def _snap_to_nearest_boundary(value: float, boundaries: list[float]) -> float:
+    """只吸附阈值内唯一最近的边界，等距时保持原值。"""
+    distances = sorted((abs(boundary - value), boundary) for boundary in boundaries)
+    nearest_distance, nearest_boundary = distances[0]
+    if nearest_distance > SEGMENT_BOUNDARY_SNAP_SECONDS:
+        return value
+    if len(distances) > 1 and math.isclose(nearest_distance, distances[1][0], abs_tol=1e-9):
+        return value
+    return nearest_boundary
+
+
 def select_segments(
     segments: Any,
     *,
     requested_start: float,
     requested_end: float,
 ) -> tuple[list[dict[str, Any]], float, float]:
-    """选择与请求区间相交的完整 segments，并把时间轴重置到首段起点。"""
+    """在阈值内吸附最近边界，选择相交 segments 并按最终起点重置时间轴。"""
     if not isinstance(segments, list) or not segments:
         raise ValueError("Caption segments must be a non-empty array")
-    selected: list[tuple[dict[str, Any], float, float]] = []
+    parsed: list[tuple[dict[str, Any], float, float]] = []
+    boundaries: set[float] = set()
     previous_end = 0.0
     for index, segment in enumerate(segments):
         start, end = _segment_times(segment, index)
         if index and start < previous_end - 0.001:
             raise ValueError("Caption segments must be ordered and non-overlapping")
         previous_end = end
-        if end > requested_start and start < requested_end:
-            selected.append((segment, start, end))
+        parsed.append((segment, start, end))
+        boundaries.update((start, end))
+
+    ordered_boundaries = sorted(boundaries)
+    actual_start = _snap_to_nearest_boundary(requested_start, ordered_boundaries)
+    actual_end = _snap_to_nearest_boundary(requested_end, ordered_boundaries)
+    if actual_end <= actual_start:
+        actual_start, actual_end = requested_start, requested_end
+
+    selected = [(segment, start, end) for segment, start, end in parsed if end > actual_start and start < actual_end]
     if not selected:
         raise ValueError("Requested frame range does not overlap any caption segment")
 
-    expanded_start = selected[0][1]
-    expanded_end = selected[-1][2]
     rebased: list[dict[str, Any]] = []
     for segment, start, end in selected:
         item = copy.deepcopy(segment)
-        item["start_time"] = round(start - expanded_start, 6)
-        item["end_time"] = round(end - expanded_start, 6)
+        item["start_time"] = round(max(start, actual_start) - actual_start, 6)
+        item["end_time"] = round(min(end, actual_end) - actual_start, 6)
         rebased.append(item)
-    return rebased, expanded_start, expanded_end
+    return rebased, actual_start, actual_end
 
 
 class CaptionCutService:
@@ -199,7 +217,7 @@ class CaptionCutService:
             source_video_oss_uri = request.source_oss_uri
         requested_start = float(request.start_frame)
         requested_end = float(request.end_frame)
-        selected, expanded_start, expanded_end = select_segments(
+        selected, actual_start, actual_end = select_segments(
             caption.get("segments"),
             requested_start=requested_start,
             requested_end=requested_end,
@@ -228,8 +246,8 @@ class CaptionCutService:
         return CaptionCutResult(
             source_video_oss_uri=source_video_oss_uri,
             result_oss_uri=result_uri,
-            start_frame=math.floor(expanded_start),
-            end_frame=math.ceil(expanded_end),
+            start_frame=math.floor(actual_start),
+            end_frame=math.ceil(actual_end),
         )
 
     def _find_caption(self, uri: str) -> dict[str, Any]:

@@ -1,4 +1,4 @@
-"""验证 segment 边界扩展、时间重置与最终结构。"""
+"""验证 segment 最近边界吸附、时间重置与最终结构。"""
 
 from __future__ import annotations
 
@@ -67,16 +67,47 @@ class CaptionCutTest(unittest.TestCase):
         self.assertEqual((expanded_start, expanded_end), (2.0, 4.0))
         self.assertEqual((selected[0]["start_time"], selected[0]["end_time"]), (0.0, 2.0))
 
-    def test_partial_overlap_expands_to_complete_segments(self) -> None:
-        selected, expanded_start, expanded_end = select_segments(
+    def test_endpoints_snap_to_nearest_boundaries(self) -> None:
+        selected, actual_start, actual_end = select_segments(
             _segments(),
             requested_start=1.5,
             requested_end=4.5,
         )
 
+        self.assertEqual(len(selected), 1)
+        self.assertEqual((actual_start, actual_end), (2.0, 4.0))
+        self.assertEqual((selected[0]["start_time"], selected[0]["end_time"]), (0.0, 2.0))
+
+    def test_boundary_at_threshold_is_used(self) -> None:
+        selected, actual_start, actual_end = select_segments(
+            [{"start_time": 0.0, "end_time": 10.0}],
+            requested_start=1.5,
+            requested_end=8.5,
+        )
+
+        self.assertEqual((actual_start, actual_end), (0.0, 10.0))
+        self.assertEqual((selected[0]["start_time"], selected[0]["end_time"]), (0.0, 10.0))
+
+    def test_endpoint_beyond_threshold_is_kept_and_segment_is_clipped(self) -> None:
+        selected, actual_start, actual_end = select_segments(
+            [{"start_time": 0.0, "end_time": 10.0}],
+            requested_start=2.0,
+            requested_end=8.0,
+        )
+
+        self.assertEqual((actual_start, actual_end), (2.0, 8.0))
+        self.assertEqual((selected[0]["start_time"], selected[0]["end_time"]), (0.0, 6.0))
+
+    def test_endpoint_equidistant_from_boundaries_is_kept(self) -> None:
+        selected, actual_start, actual_end = select_segments(
+            _segments(),
+            requested_start=1.0,
+            requested_end=5.0,
+        )
+
+        self.assertEqual((actual_start, actual_end), (1.0, 5.0))
         self.assertEqual(len(selected), 3)
-        self.assertEqual((expanded_start, expanded_end), (0.0, 6.0))
-        self.assertEqual(selected[-1]["end_time"], 6.0)
+        self.assertEqual((selected[0]["start_time"], selected[-1]["end_time"]), (0.0, 4.0))
 
     def test_service_rebuilds_global_and_uploads_fixed_structure(self) -> None:
         with tempfile.TemporaryDirectory() as directory:

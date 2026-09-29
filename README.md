@@ -1,7 +1,7 @@
 # CaptionCutService
 
 基于 FastAPI 的常驻 rich caption 切分服务。调用方提交 `start_frame`、`end_frame`、`source_oss_uri` 后，接口等待
-OSS 内网读取、segment 边界扩展、Global task 重建与结果上传全部完成，再直接返回结果：
+OSS 内网读取、segment 边界匹配、Global task 重建与结果上传全部完成，再直接返回结果：
 
 ```text
 oss://ss-oss-intern/user/mengjun/CaptionCutService/
@@ -13,10 +13,9 @@ oss://ss-oss-intern/user/mengjun/CaptionCutService/
 POST /api/caption-cuts
   -> 定位源 rich caption
   -> frame 区间直接映射到 Caption 的 1 FPS 时间轴
-  -> 选择所有相交 segment
-  -> 起点前扩到首个 segment.start_time
-  -> 终点后扩到末个 segment.end_time
-  -> segment 时间轴重置为从 0 秒开始
+  -> 起点和终点在 1.5 秒内吸附到最近 segment 边界
+  -> 超过 1.5 秒时保留请求边界并裁剪首尾 segment
+  -> segment 时间轴按最终起点重置
   -> Ark 根据所选 segments 重写 task.command/task.step/outcome
   -> 保留源 scene 与 task.domain/type，拼接所选 segments
   -> 本机原子写入并上传固定 OSS 前缀
@@ -24,8 +23,8 @@ POST /api/caption-cuts
 ```
 
 `start_frame` 包含，`end_frame` 按右开区间处理，即 `[start_frame, end_frame)`；接口按 Caption 的 1 FPS
-时间轴直接匹配，不探测源视频 FPS。segment 使用区间相交规则，边界
-刚好相等时不会额外包含相邻 segment。输出 segments 保留原有内容，只调整 `start_time/end_time` 使首段从 0 开始。
+时间轴直接匹配，不探测源视频 FPS。每个端点只在距离最近 segment 边界不超过 1.5 秒时吸附，边界可能位于端点之前或之后；
+超过阈值或与两个边界等距时不移动。segment 使用区间相交规则，边界刚好相等时不会额外包含相邻 segment，输出只调整首尾时间并按最终起点重置。
 
 `source_oss_uri` 支持三种形式：
 
@@ -56,8 +55,8 @@ curl -i -X POST http://127.0.0.1:8010/api/caption-cuts \
   "result": {
     "source_video_oss_uri": "oss://bucket/path/video.mp4",
     "result_oss_uri": "oss://ss-oss-intern/user/mengjun/CaptionCutService/video_rich_caption_300_900.json",
-    "start_frame": 280,
-    "end_frame": 920
+    "start_frame": 299,
+    "end_frame": 901
   }
 }
 ```
