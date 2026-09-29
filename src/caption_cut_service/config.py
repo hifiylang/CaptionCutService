@@ -23,7 +23,6 @@ OSS_CONNECT_TIMEOUT_SECONDS = 15
 MAX_CAPTION_BYTES = 16 * 1024 * 1024
 MAX_CAPTION_CANDIDATES = 200
 WORKER_CONCURRENCY = 4
-FFPROBE_TIMEOUT_SECONDS = 30
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 DATA_DIR = PROJECT_ROOT / "data"
@@ -82,7 +81,6 @@ class Settings:
     max_caption_bytes: int = MAX_CAPTION_BYTES
     max_caption_candidates: int = MAX_CAPTION_CANDIDATES
     worker_concurrency: int = WORKER_CONCURRENCY
-    ffprobe_timeout_seconds: int = FFPROBE_TIMEOUT_SECONDS
 
     @property
     def task_staging_dir(self) -> Path:

@@ -24,6 +24,8 @@ class ApiContractTest(unittest.TestCase):
             set(request_schema["required"]),
             {"start_frame", "end_frame", "source_oss_uri"},
         )
+        result_schema = openapi["components"]["schemas"]["CaptionCutResult"]
+        self.assertNotIn("source_fps", result_schema["properties"])
         self.assertNotIn("/api/v1/caption-cuts", paths)
 
 

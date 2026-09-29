@@ -1,16 +1,13 @@
-"""阿里云 OSS 对象发现、读取、FPS 探测与结果上传。"""
+"""阿里云 OSS 对象发现、读取与结果上传。"""
 
 from __future__ import annotations
 
 import json
 import logging
-import math
 import os
-import subprocess
 import tempfile
 import time
 from collections.abc import Callable
-from fractions import Fraction
 from functools import lru_cache
 from pathlib import Path, PurePosixPath
 from typing import Any, TypeVar
@@ -131,48 +128,6 @@ class OssStorage:
             return sorted(result)
 
         return _retry("caption_list", collect, self.settings.oss_retry_attempts)
-
-    def probe_video_fps(self, video_uri: str) -> float:
-        """通过短期内网签名 URL 读取视频平均帧率，不下载完整视频。"""
-        bucket_name, key = parse_oss_uri(video_uri)
-        bucket = _bucket(bucket_name, self.settings)
-        signed_url = bucket.sign_url("GET", key, 300, slash_safe=True)
-        command = [
-            "ffprobe",
-            "-v",
-            "error",
-            "-select_streams",
-            "v:0",
-            "-show_entries",
-            "stream=avg_frame_rate,r_frame_rate",
-            "-of",
-            "json",
-            signed_url,
-        ]
-        try:
-            completed = subprocess.run(
-                command,
-                check=True,
-                capture_output=True,
-                text=True,
-                timeout=self.settings.ffprobe_timeout_seconds,
-            )
-        except (OSError, subprocess.SubprocessError) as exc:
-            # 签名 URL 含凭证信息，异常中不得附带 command 或 stderr。
-            raise RuntimeError(f"Unable to probe source video FPS: {type(exc).__name__}") from exc
-        payload = json.loads(completed.stdout)
-        streams = payload.get("streams")
-        if not isinstance(streams, list) or not streams:
-            raise ValueError("Source video has no video stream")
-        for field in ("avg_frame_rate", "r_frame_rate"):
-            raw = streams[0].get(field)
-            try:
-                fps = float(Fraction(str(raw)))
-            except (ValueError, ZeroDivisionError):
-                continue
-            if math.isfinite(fps) and 0 < fps <= 240:
-                return fps
-        raise ValueError("Source video FPS is missing or invalid")
 
     def upload_json(self, value: dict[str, Any], uri: str, staging_path: Path) -> str:
         """原子暂存 JSON、上传到 OSS，并校验远端对象长度。"""

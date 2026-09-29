@@ -195,12 +195,11 @@ class CaptionCutService:
         source_video_uri = caption.get("video_oss_uri")
         if not isinstance(source_video_uri, str) or not source_video_uri.startswith("oss://"):
             if request.source_oss_uri.lower().endswith(".json") or request.source_oss_uri.endswith("/"):
-                raise ValueError("Caption JSON must contain video_oss_uri for FPS probing")
+                raise ValueError("Caption JSON must contain video_oss_uri")
             source_video_uri = request.source_oss_uri
 
-        fps = self.storage.probe_video_fps(source_video_uri)
-        requested_start = request.start_frame / fps
-        requested_end = request.end_frame / fps
+        requested_start = float(request.start_frame)
+        requested_end = float(request.end_frame)
         selected, expanded_start, expanded_end = select_segments(
             caption.get("segments"),
             requested_start=requested_start,
@@ -230,11 +229,10 @@ class CaptionCutService:
             result_oss_uri=result_uri,
             source_caption_oss_uri=caption_uri,
             source_video_oss_uri=source_video_uri,
-            source_fps=round(fps, 6),
             requested_start_frame=request.start_frame,
             requested_end_frame=request.end_frame,
-            expanded_start_frame=round(expanded_start * fps),
-            expanded_end_frame=round(expanded_end * fps),
+            expanded_start_frame=round(expanded_start),
+            expanded_end_frame=round(expanded_end),
             segment_count=len(selected),
         )
 

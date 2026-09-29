@@ -49,9 +49,6 @@ class FakeStorage:
     def list_rich_captions(self, uri: str) -> list[str]:
         return []
 
-    def probe_video_fps(self, video_uri: str) -> float:
-        return 10.0
-
     def upload_json(self, value: dict[str, Any], uri: str, staging_path: Path) -> str:
         self.uploaded = value
         return uri
@@ -98,15 +95,15 @@ class CaptionCutTest(unittest.TestCase):
             service = CaptionCutService(settings, storage, summarize)
             result = service.cut(
                 CaptionCutRequest(
-                    start_frame=20,
-                    end_frame=40,
+                    start_frame=2,
+                    end_frame=4,
                     source_oss_uri="oss://source/path/video.mp4",
                 ),
                 "task123",
             )
 
-        self.assertEqual(result.expanded_start_frame, 20)
-        self.assertEqual(result.expanded_end_frame, 40)
+        self.assertEqual(result.expanded_start_frame, 2)
+        self.assertEqual(result.expanded_end_frame, 4)
         self.assertEqual(result.segment_count, 1)
         assert storage.uploaded is not None
         self.assertEqual(set(storage.uploaded), {"scene", "task", "segments"})
@@ -137,7 +134,6 @@ class CaptionCutTest(unittest.TestCase):
             result_oss_uri="oss://result/caption.json",
             source_caption_oss_uri="oss://source/video_rich_caption.json",
             source_video_oss_uri="oss://source/video.mp4",
-            source_fps=25.0,
             requested_start_frame=1,
             requested_end_frame=2,
             expanded_start_frame=0,

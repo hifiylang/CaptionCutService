@@ -15,8 +15,7 @@ POST /api/caption-cuts
   -> 进程内登记 queued
   -> 202 + task_id
   -> 定位源 rich caption
-  -> 通过 OSS 内网签名 URL + ffprobe 读取真实 FPS
-  -> frame 区间换算为秒
+  -> frame 区间直接映射到 Caption 的 1 FPS 时间轴
   -> 选择所有相交 segment
   -> 起点前扩到首个 segment.start_time
   -> 终点后扩到末个 segment.end_time
@@ -27,13 +26,14 @@ POST /api/caption-cuts
   -> GET /api/caption-cuts/{task_id} 返回结果地址和实际边界
 ```
 
-`start_frame` 包含，`end_frame` 按右开区间处理，即 `[start_frame, end_frame)`。segment 使用区间相交规则，边界
+`start_frame` 包含，`end_frame` 按右开区间处理，即 `[start_frame, end_frame)`；接口按 Caption 的 1 FPS
+时间轴直接匹配，不探测源视频 FPS。segment 使用区间相交规则，边界
 刚好相等时不会额外包含相邻 segment。输出 segments 保留原有内容，只调整 `start_time/end_time` 使首段从 0 开始。
 
 `source_oss_uri` 支持三种形式：
 
 - 源视频 OSS URI：优先寻找同目录 `<视频文件名 stem>_rich_caption.json`，再按 `video_oss_uri` 匹配。
-- rich caption JSON URI：直接读取，但 JSON 必须包含 `video_oss_uri`，用于探测真实 FPS。
+- rich caption JSON URI：直接读取，但 JSON 必须包含 `video_oss_uri`，用于记录来源。
 - OSS 目录 URI：目录中只能有一个 rich caption 候选，且该 JSON 必须包含 `video_oss_uri`。
 
 ## API
@@ -66,8 +66,8 @@ curl -i -X POST http://127.0.0.1:8010/api/caption-cuts \
 curl http://127.0.0.1:8010/api/caption-cuts/7fdb...
 ```
 
-成功后的 `result` 包含 `result_oss_uri`、源 caption/video URI、源 FPS、请求帧范围、扩展后的实际帧范围和
-segment 数量。失败后的 `error` 保存可对外定位的错误，不包含密钥、Token 或 OSS 签名 URL。
+成功后的 `result` 包含 `result_oss_uri`、源 caption/video URI、请求帧范围、扩展后的实际帧范围和
+segment 数量。失败后的 `error` 保存可对外定位的错误，不包含密钥或 Token。
 
 ## 配置与启动
 

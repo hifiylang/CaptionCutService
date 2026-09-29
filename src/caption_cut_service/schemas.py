@@ -52,7 +52,6 @@ class CaptionCutResult(BaseModel):
     result_oss_uri: str
     source_caption_oss_uri: str
     source_video_oss_uri: str
-    source_fps: float = Field(gt=0)
     requested_start_frame: int = Field(ge=0)
     requested_end_frame: int = Field(gt=0)
     expanded_start_frame: int = Field(ge=0)
