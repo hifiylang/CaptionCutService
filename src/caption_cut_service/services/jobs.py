@@ -52,12 +52,17 @@ class CaptionCutJobs:
     def _run(self, task_id: str, request: CaptionCutRequest) -> None:
         self._update(task_id, status=JobStatus.RUNNING, error=None)
         try:
-            result = self.cutter.cut(request, task_id)
+            source_video_oss_uri, result_oss_uri = self.cutter.cut(request, task_id)
         except Exception as exc:  # noqa: BLE001 - 后台异常必须转换为可查询的失败状态
             LOGGER.exception("caption_cut_failed task_id=%s error_type=%s", task_id, type(exc).__name__)
             self._update(task_id, status=JobStatus.FAILED, error=str(exc)[:1000])
             return
-        self._update(task_id, status=JobStatus.SUCCEEDED, result_oss_uri=result)
+        self._update(
+            task_id,
+            status=JobStatus.SUCCEEDED,
+            source_video_oss_uri=source_video_oss_uri,
+            result_oss_uri=result_oss_uri,
+        )
 
     def close(self) -> None:
         """停止接收任务，并等待进程内已经开始的交付完成。"""

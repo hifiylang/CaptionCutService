@@ -102,7 +102,13 @@ class CaptionCutTest(unittest.TestCase):
                 "task123",
             )
 
-        self.assertEqual(result, "oss://ss-oss-intern/user/mengjun/CaptionCutService/task123_rich_caption.json")
+        self.assertEqual(
+            result,
+            (
+                "oss://source/path/video.mp4",
+                "oss://ss-oss-intern/user/mengjun/CaptionCutService/task123_rich_caption_2_4.json",
+            ),
+        )
         assert storage.uploaded is not None
         self.assertEqual(set(storage.uploaded), {"scene", "task", "segments"})
         self.assertEqual(storage.uploaded["task"]["type"], "food_drink_preparation")
@@ -128,7 +134,7 @@ class CaptionCutTest(unittest.TestCase):
 
     def test_job_state_is_process_local(self) -> None:
         cutter = MagicMock()
-        cutter.cut.return_value = "oss://result/caption.json"
+        cutter.cut.return_value = ("oss://source/video.mp4", "oss://result/caption_1_2.json")
         request = CaptionCutRequest(
             start_frame=1,
             end_frame=2,
@@ -141,7 +147,8 @@ class CaptionCutTest(unittest.TestCase):
         completed = jobs.get(submitted.task_id)
 
         self.assertEqual(completed.status, JobStatus.SUCCEEDED)
-        self.assertEqual(completed.result_oss_uri, "oss://result/caption.json")
+        self.assertEqual(completed.source_video_oss_uri, "oss://source/video.mp4")
+        self.assertEqual(completed.result_oss_uri, "oss://result/caption_1_2.json")
         restarted = CaptionCutJobs(cutter, concurrency=1)
         try:
             self.assertIsNone(restarted.get(submitted.task_id))

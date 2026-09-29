@@ -29,7 +29,7 @@ class ApiContractTest(unittest.TestCase):
         task_schema = openapi["components"]["schemas"]["CaptionCutTask"]
         self.assertEqual(
             set(task_schema["properties"]),
-            {"task_id", "status", "result_oss_uri", "error"},
+            {"task_id", "status", "source_video_oss_uri", "result_oss_uri", "error"},
         )
         self.assertNotIn("CaptionCutResult", openapi["components"]["schemas"])
         self.assertNotIn("/api/v1/caption-cuts", paths)

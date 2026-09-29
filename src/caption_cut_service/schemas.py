@@ -47,5 +47,6 @@ class CaptionCutTask(BaseModel):
 
     task_id: str
     status: JobStatus
+    source_video_oss_uri: str | None = None
     result_oss_uri: str | None = None
     error: str | None = None

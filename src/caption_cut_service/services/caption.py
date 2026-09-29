@@ -188,9 +188,14 @@ class CaptionCutService:
         self.storage = storage
         self.summarizer = summarizer or ArkGlobalSummarizer(settings)
 
-    def cut(self, request: CaptionCutRequest, task_id: str) -> str:
-        """完成发现、边界扩展、Global 重建与上传，并返回结果 URI。"""
+    def cut(self, request: CaptionCutRequest, task_id: str) -> tuple[str, str]:
+        """完成发现、边界扩展、Global 重建与上传，并返回源视频和结果 URI。"""
         caption = self._find_caption(request.source_oss_uri)
+        source_video_oss_uri = caption.get("video_oss_uri")
+        if not isinstance(source_video_oss_uri, str) or not source_video_oss_uri.startswith("oss://"):
+            if request.source_oss_uri.lower().endswith(".json") or request.source_oss_uri.endswith("/"):
+                raise ValueError("Caption JSON must contain video_oss_uri")
+            source_video_oss_uri = request.source_oss_uri
         requested_start = float(request.start_frame)
         requested_end = float(request.end_frame)
         selected, _, _ = select_segments(
@@ -213,10 +218,11 @@ class CaptionCutService:
             task["outcome"] = summary["outcome"]
         result = {"scene": copy.deepcopy(source_scene), "task": task, "segments": selected}
 
-        result_uri = f"{self.settings.output_oss_prefix}/{task_id}_rich_caption.json"
+        result_name = f"{task_id}_rich_caption_{request.start_frame}_{request.end_frame}.json"
+        result_uri = f"{self.settings.output_oss_prefix}/{result_name}"
         staging_path = self.settings.task_staging_dir / task_id / "result.json"
         self.storage.upload_json(result, result_uri, staging_path)
-        return result_uri
+        return source_video_oss_uri, result_uri
 
     def _find_caption(self, uri: str) -> dict[str, Any]:
         """优先读取确定性文件名，再用 video_oss_uri 消除同目录多候选歧义。"""

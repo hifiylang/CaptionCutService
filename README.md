@@ -67,7 +67,8 @@ curl -i -X POST http://127.0.0.1:8010/api/caption-cuts \
 curl http://127.0.0.1:8010/api/caption-cuts/7fdb...
 ```
 
-成功后只返回 `result_oss_uri`；失败后的 `error` 保存可对外定位的错误，不包含密钥或 Token。
+成功后返回 `source_video_oss_uri` 和 `result_oss_uri`；结果文件名固定为
+`<task_id>_rich_caption_<start_frame>_<end_frame>.json`。失败后的 `error` 保存可对外定位的错误，不包含密钥或 Token。
 
 ## 配置与启动
 
