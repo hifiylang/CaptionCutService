@@ -8,12 +8,11 @@ import math
 import time
 from pathlib import PurePosixPath
 from typing import Any, Protocol
-from urllib.parse import urlparse
 
 import requests
 
 from caption_cut_service.config import Settings
-from caption_cut_service.schemas import CaptionCutRequest, CaptionCutResult
+from caption_cut_service.schemas import CaptionCutRequest
 from caption_cut_service.storage import OssStorage
 
 OUTCOMES = {
@@ -189,18 +188,12 @@ class CaptionCutService:
         self.storage = storage
         self.summarizer = summarizer or ArkGlobalSummarizer(settings)
 
-    def cut(self, request: CaptionCutRequest, task_id: str) -> CaptionCutResult:
-        """完成发现、边界扩展、Global 重建、上传，并返回查询元数据。"""
-        caption_uri, caption = self._find_caption(request.source_oss_uri)
-        source_video_uri = caption.get("video_oss_uri")
-        if not isinstance(source_video_uri, str) or not source_video_uri.startswith("oss://"):
-            if request.source_oss_uri.lower().endswith(".json") or request.source_oss_uri.endswith("/"):
-                raise ValueError("Caption JSON must contain video_oss_uri")
-            source_video_uri = request.source_oss_uri
-
+    def cut(self, request: CaptionCutRequest, task_id: str) -> str:
+        """完成发现、边界扩展、Global 重建与上传，并返回结果 URI。"""
+        caption = self._find_caption(request.source_oss_uri)
         requested_start = float(request.start_frame)
         requested_end = float(request.end_frame)
-        selected, expanded_start, expanded_end = select_segments(
+        selected, _, _ = select_segments(
             caption.get("segments"),
             requested_start=requested_start,
             requested_end=requested_end,
@@ -220,26 +213,15 @@ class CaptionCutService:
             task["outcome"] = summary["outcome"]
         result = {"scene": copy.deepcopy(source_scene), "task": task, "segments": selected}
 
-        source_name = PurePosixPath(urlparse(source_video_uri).path).stem or "caption"
-        output_name = f"{source_name}_{request.start_frame}_{request.end_frame}_{task_id}_rich_caption.json"
-        result_uri = f"{self.settings.output_oss_prefix}/{output_name}"
+        result_uri = f"{self.settings.output_oss_prefix}/{task_id}_rich_caption.json"
         staging_path = self.settings.task_staging_dir / task_id / "result.json"
         self.storage.upload_json(result, result_uri, staging_path)
-        return CaptionCutResult(
-            result_oss_uri=result_uri,
-            source_caption_oss_uri=caption_uri,
-            source_video_oss_uri=source_video_uri,
-            requested_start_frame=request.start_frame,
-            requested_end_frame=request.end_frame,
-            expanded_start_frame=round(expanded_start),
-            expanded_end_frame=round(expanded_end),
-            segment_count=len(selected),
-        )
+        return result_uri
 
-    def _find_caption(self, uri: str) -> tuple[str, dict[str, Any]]:
+    def _find_caption(self, uri: str) -> dict[str, Any]:
         """优先读取确定性文件名，再用 video_oss_uri 消除同目录多候选歧义。"""
         if uri.lower().endswith(".json"):
-            return uri, self.storage.read_json(uri)
+            return self.storage.read_json(uri)
 
         if not uri.endswith("/"):
             bucket, key = uri.removeprefix("oss://").split("/", 1)
@@ -249,18 +231,18 @@ class CaptionCutService:
                 payload = self.storage.read_json(exact)
                 archived_source = payload.get("video_oss_uri")
                 if archived_source in (None, uri):
-                    return exact, payload
+                    return payload
 
         candidates = self.storage.list_rich_captions(uri)
-        matches: list[tuple[str, dict[str, Any]]] = []
+        matches: list[dict[str, Any]] = []
         for candidate in candidates:
             payload = self.storage.read_json(candidate)
             if payload.get("video_oss_uri") == uri:
-                matches.append((candidate, payload))
+                matches.append(payload)
         if len(matches) == 1:
             return matches[0]
         if uri.endswith("/") and len(candidates) == 1:
-            return candidates[0], self.storage.read_json(candidates[0])
+            return self.storage.read_json(candidates[0])
         if not matches:
             raise FileNotFoundError("No rich caption matched the requested OSS path")
         raise ValueError("Multiple rich captions matched the requested OSS path")

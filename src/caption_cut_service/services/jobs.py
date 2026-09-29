@@ -6,16 +6,11 @@ import logging
 import threading
 import uuid
 from concurrent.futures import ThreadPoolExecutor
-from datetime import UTC, datetime
 
 from caption_cut_service.schemas import CaptionCutRequest, CaptionCutTask, JobStatus
 from caption_cut_service.services.caption import CaptionCutService
 
 LOGGER = logging.getLogger(__name__)
-
-
-def _now() -> datetime:
-    return datetime.now(UTC)
 
 
 class CaptionCutJobs:
@@ -34,12 +29,9 @@ class CaptionCutJobs:
             if self._closed:
                 raise RuntimeError("Caption cut job service is closed")
             task_id = uuid.uuid4().hex
-            timestamp = _now()
             task = CaptionCutTask(
                 task_id=task_id,
                 status=JobStatus.QUEUED,
-                created_at=timestamp,
-                updated_at=timestamp,
             )
             # ponytail: 任务历史只保留到进程退出；高吞吐运行时再增加 TTL 清理。
             self.tasks[task_id] = task
@@ -55,7 +47,7 @@ class CaptionCutJobs:
     def _update(self, task_id: str, **changes: object) -> None:
         """在同一把锁下替换任务快照，避免查询读到半更新状态。"""
         with self._lock:
-            self.tasks[task_id] = self.tasks[task_id].model_copy(update={**changes, "updated_at": _now()})
+            self.tasks[task_id] = self.tasks[task_id].model_copy(update=changes)
 
     def _run(self, task_id: str, request: CaptionCutRequest) -> None:
         self._update(task_id, status=JobStatus.RUNNING, error=None)
@@ -65,7 +57,7 @@ class CaptionCutJobs:
             LOGGER.exception("caption_cut_failed task_id=%s error_type=%s", task_id, type(exc).__name__)
             self._update(task_id, status=JobStatus.FAILED, error=str(exc)[:1000])
             return
-        self._update(task_id, status=JobStatus.SUCCEEDED, result=result)
+        self._update(task_id, status=JobStatus.SUCCEEDED, result_oss_uri=result)
 
     def close(self) -> None:
         """停止接收任务，并等待进程内已经开始的交付完成。"""

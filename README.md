@@ -23,7 +23,7 @@ POST /api/caption-cuts
   -> Ark 根据所选 segments 重写 task.command/task.step/outcome
   -> 保留源 scene 与 task.domain/type，拼接所选 segments
   -> 本机原子写入并上传固定 OSS 前缀
-  -> GET /api/caption-cuts/{task_id} 返回结果地址和实际边界
+  -> GET /api/caption-cuts/{task_id} 返回结果地址
 ```
 
 `start_frame` 包含，`end_frame` 按右开区间处理，即 `[start_frame, end_frame)`；接口按 Caption 的 1 FPS
@@ -55,10 +55,11 @@ curl -i -X POST http://127.0.0.1:8010/api/caption-cuts \
 ```json
 {
   "task_id": "7fdb...",
-  "status": "queued",
-  "status_url": "http://127.0.0.1:8010/api/caption-cuts/7fdb..."
+  "status": "queued"
 }
 ```
+
+查询地址通过响应头 `Location` 返回。
 
 查询任务：
 
@@ -66,8 +67,7 @@ curl -i -X POST http://127.0.0.1:8010/api/caption-cuts \
 curl http://127.0.0.1:8010/api/caption-cuts/7fdb...
 ```
 
-成功后的 `result` 包含 `result_oss_uri`、源 caption/video URI、请求帧范围、扩展后的实际帧范围和
-segment 数量。失败后的 `error` 保存可对外定位的错误，不包含密钥或 Token。
+成功后只返回 `result_oss_uri`；失败后的 `error` 保存可对外定位的错误，不包含密钥或 Token。
 
 ## 配置与启动
 

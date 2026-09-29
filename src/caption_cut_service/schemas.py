@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-from datetime import datetime
 from enum import StrEnum
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
@@ -41,30 +40,12 @@ class CaptionCutSubmission(BaseModel):
 
     task_id: str
     status: JobStatus
-    status_url: str
-
-
-class CaptionCutResult(BaseModel):
-    """成功任务返回的来源、交付地址和实际切分边界。"""
-
-    model_config = ConfigDict(extra="forbid")
-
-    result_oss_uri: str
-    source_caption_oss_uri: str
-    source_video_oss_uri: str
-    requested_start_frame: int = Field(ge=0)
-    requested_end_frame: int = Field(gt=0)
-    expanded_start_frame: int = Field(ge=0)
-    expanded_end_frame: int = Field(gt=0)
-    segment_count: int = Field(gt=0)
 
 
 class CaptionCutTask(BaseModel):
-    """任务查询响应；成功时 result 保存 OSS 地址与实际扩展边界。"""
+    """任务查询响应；成功时只返回最终 OSS 地址。"""
 
     task_id: str
     status: JobStatus
-    result: CaptionCutResult | None = None
+    result_oss_uri: str | None = None
     error: str | None = None
-    created_at: datetime
-    updated_at: datetime
