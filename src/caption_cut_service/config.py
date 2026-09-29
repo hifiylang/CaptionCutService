@@ -22,7 +22,6 @@ OSS_RETRY_ATTEMPTS = 5
 OSS_CONNECT_TIMEOUT_SECONDS = 15
 MAX_CAPTION_BYTES = 16 * 1024 * 1024
 MAX_CAPTION_CANDIDATES = 200
-WORKER_CONCURRENCY = 4
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 DATA_DIR = PROJECT_ROOT / "data"
@@ -80,12 +79,11 @@ class Settings:
     oss_connect_timeout_seconds: int = OSS_CONNECT_TIMEOUT_SECONDS
     max_caption_bytes: int = MAX_CAPTION_BYTES
     max_caption_candidates: int = MAX_CAPTION_CANDIDATES
-    worker_concurrency: int = WORKER_CONCURRENCY
 
     @property
-    def task_staging_dir(self) -> Path:
+    def staging_dir(self) -> Path:
         """返回结果上传前的原子暂存目录。"""
-        return self.data_dir / "tasks"
+        return self.data_dir / "staging"
 
 
 @lru_cache(maxsize=1)

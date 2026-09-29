@@ -5,8 +5,9 @@ from __future__ import annotations
 import copy
 import json
 import math
+import tempfile
 import time
-from pathlib import PurePosixPath
+from pathlib import Path, PurePosixPath
 from typing import Any, Protocol
 
 import requests
@@ -176,7 +177,7 @@ def select_segments(
 
 
 class CaptionCutService:
-    """编排单个 Caption 切分任务，并只向固定 OSS 前缀交付结果。"""
+    """编排单次 Caption 切分，并只向固定 OSS 前缀交付结果。"""
 
     def __init__(
         self,
@@ -188,7 +189,7 @@ class CaptionCutService:
         self.storage = storage
         self.summarizer = summarizer or ArkGlobalSummarizer(settings)
 
-    def cut(self, request: CaptionCutRequest, task_id: str) -> CaptionCutResult:
+    def cut(self, request: CaptionCutRequest) -> CaptionCutResult:
         """完成切分与上传，并返回来源、交付地址和实际切分范围。"""
         caption = self._find_caption(request.source_oss_uri)
         source_video_oss_uri = caption.get("video_oss_uri")
@@ -218,10 +219,12 @@ class CaptionCutService:
             task["outcome"] = summary["outcome"]
         result = {"scene": copy.deepcopy(source_scene), "task": task, "segments": selected}
 
-        result_name = f"{task_id}_rich_caption_{request.start_frame}_{request.end_frame}.json"
+        video_name = PurePosixPath(source_video_oss_uri).stem
+        result_name = f"{video_name}_rich_caption_{request.start_frame}_{request.end_frame}.json"
         result_uri = f"{self.settings.output_oss_prefix}/{result_name}"
-        staging_path = self.settings.task_staging_dir / task_id / "result.json"
-        self.storage.upload_json(result, result_uri, staging_path)
+        self.settings.staging_dir.mkdir(parents=True, exist_ok=True)
+        with tempfile.TemporaryDirectory(dir=self.settings.staging_dir) as directory:
+            self.storage.upload_json(result, result_uri, Path(directory) / result_name)
         return CaptionCutResult(
             source_video_oss_uri=source_video_oss_uri,
             result_oss_uri=result_uri,

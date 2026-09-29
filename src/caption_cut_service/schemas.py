@@ -1,19 +1,8 @@
-"""Caption 切分请求、异步任务与结果查询协议。"""
+"""Caption 切分请求与同步结果协议。"""
 
 from __future__ import annotations
 
-from enum import StrEnum
-
 from pydantic import BaseModel, ConfigDict, Field, model_validator
-
-
-class JobStatus(StrEnum):
-    """异步任务在当前进程内的状态。"""
-
-    QUEUED = "queued"
-    RUNNING = "running"
-    SUCCEEDED = "succeeded"
-    FAILED = "failed"
 
 
 class CaptionCutRequest(BaseModel):
@@ -35,17 +24,8 @@ class CaptionCutRequest(BaseModel):
         return self
 
 
-class CaptionCutSubmission(BaseModel):
-    """任务提交后的 202 响应。"""
-
-    task_id: str
-    status: JobStatus
-    start_frame: int
-    end_frame: int
-
-
 class CaptionCutResult(BaseModel):
-    """成功任务的来源、交付地址与实际切分范围。"""
+    """来源、交付地址与实际切分范围。"""
 
     source_video_oss_uri: str
     result_oss_uri: str
@@ -53,12 +33,9 @@ class CaptionCutResult(BaseModel):
     end_frame: int
 
 
-class CaptionCutTask(BaseModel):
-    """任务查询响应；成功时在 result 中返回实际切分结果。"""
+class CaptionCutResponse(BaseModel):
+    """同步接口响应；外层保留请求范围，内层返回实际切分结果。"""
 
-    task_id: str
-    status: JobStatus
     start_frame: int
     end_frame: int
-    result: CaptionCutResult | None = None
-    error: str | None = None
+    result: CaptionCutResult

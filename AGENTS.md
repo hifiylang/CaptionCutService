@@ -3,7 +3,7 @@
 ## 项目边界
 
 - FastAPI 唯一入口为 `caption_cut_service.main:app`，路由只负责协议解析和 HTTP 状态码。
-- `services/caption.py` 负责 Caption 切分编排，`services/jobs.py` 负责进程内异步任务状态。
+- `services/caption.py` 负责同步 Caption 切分编排，接口等待上传完成后直接返回结果。
 - OSS SDK 调用只允许出现在 `storage/oss.py`；结果只允许写入
   `oss://ss-oss-intern/user/mengjun/CaptionCutService/`。
 - 凭证只从环境变量或未提交的 `.env` 读取，不得写入源码、日志、响应和提交记录。
@@ -14,7 +14,7 @@
 - segment 采用区间相交规则；输出范围前扩到首段起点、后扩到末段终点。
 - 输出 segments 保留源字段，只把时间重置到首段从 0 秒开始。
 - Global 只重新生成 `task.command`、`task.step` 和可选 `task.outcome`；`scene`、`task.domain/type` 保留源值。
-- 最终 OSS JSON 只包含 `scene`、`task`、`segments`，运行元数据只保存在任务查询响应中。
+- 最终 OSS JSON 只包含 `scene`、`task`、`segments`，来源与切分范围只保存在同步接口响应中。
 
 ## 编码与验证
 

@@ -1,8 +1,7 @@
 # CaptionCutService
 
-基于 FastAPI 的常驻 rich caption 切分服务。调用方提交 `start_frame`、`end_frame`、`source_oss_uri` 后立即获得
-`202 Accepted` 和 `task_id`；后台通过 OSS 内网读取源 rich caption，按 segment 边界扩展范围，重新生成当前片段的
-Global task 信息，并把新 JSON 上传到：
+基于 FastAPI 的常驻 rich caption 切分服务。调用方提交 `start_frame`、`end_frame`、`source_oss_uri` 后，接口等待
+OSS 内网读取、segment 边界扩展、Global task 重建与结果上传全部完成，再直接返回结果：
 
 ```text
 oss://ss-oss-intern/user/mengjun/CaptionCutService/
@@ -12,8 +11,6 @@ oss://ss-oss-intern/user/mengjun/CaptionCutService/
 
 ```text
 POST /api/caption-cuts
-  -> 进程内登记 queued
-  -> 202 + task_id
   -> 定位源 rich caption
   -> frame 区间直接映射到 Caption 的 1 FPS 时间轴
   -> 选择所有相交 segment
@@ -23,7 +20,7 @@ POST /api/caption-cuts
   -> Ark 根据所选 segments 重写 task.command/task.step/outcome
   -> 保留源 scene 与 task.domain/type，拼接所选 segments
   -> 本机原子写入并上传固定 OSS 前缀
-  -> GET /api/caption-cuts/{task_id} 返回结果地址
+  -> 200 直接返回结果地址和实际切分范围
 ```
 
 `start_frame` 包含，`end_frame` 按右开区间处理，即 `[start_frame, end_frame)`；接口按 Caption 的 1 FPS
@@ -38,7 +35,7 @@ POST /api/caption-cuts
 
 ## API
 
-提交任务：
+同步切分：
 
 ```bash
 curl -i -X POST http://127.0.0.1:8010/api/caption-cuts \
@@ -50,45 +47,23 @@ curl -i -X POST http://127.0.0.1:8010/api/caption-cuts \
   }'
 ```
 
-响应：
+处理完成后的响应：
 
 ```json
 {
-  "task_id": "7fdb...",
-  "status": "queued",
-  "start_frame": 300,
-  "end_frame": 900
-}
-```
-
-查询地址通过响应头 `Location` 返回。
-
-查询任务：
-
-```bash
-curl http://127.0.0.1:8010/api/caption-cuts/7fdb...
-```
-
-成功后返回请求范围和按 segment 边界扩展后的实际切分范围：
-
-```json
-{
-  "task_id": "7fdb...",
-  "status": "succeeded",
   "start_frame": 300,
   "end_frame": 900,
   "result": {
     "source_video_oss_uri": "oss://bucket/path/video.mp4",
-    "result_oss_uri": "oss://ss-oss-intern/user/mengjun/CaptionCutService/7fdb..._rich_caption_300_900.json",
+    "result_oss_uri": "oss://ss-oss-intern/user/mengjun/CaptionCutService/video_rich_caption_300_900.json",
     "start_frame": 280,
     "end_frame": 920
-  },
-  "error": null
+  }
 }
 ```
 
 外层 `start_frame/end_frame` 原样返回请求值，`result.start_frame/end_frame` 是实际截取值。结果文件名固定为
-`<task_id>_rich_caption_<请求 start_frame>_<请求 end_frame>.json`。失败后的 `error` 保存可对外定位的错误，不包含密钥或 Token。
+`<源视频名>_rich_caption_<请求 start_frame>_<请求 end_frame>.json`。输入或匹配错误返回 `400`，外部服务错误返回 `502`。
 
 ## 配置与启动
 
@@ -107,5 +82,4 @@ caption-cut-api
 docker compose up --build -d
 ```
 
-服务地址为 `http://127.0.0.1:8010`，OpenAPI 文档位于 `/docs`。任务状态只保存在当前服务进程内，重启后
-原 task ID 不再可查询；上传前的本机暂存结果保存在 `data/tasks/`。
+服务地址为 `http://127.0.0.1:8010`，OpenAPI 文档位于 `/docs`。上传过程使用 `data/staging/` 临时暂存，完成后自动清理。

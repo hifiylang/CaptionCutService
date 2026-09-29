@@ -1,20 +1,20 @@
-"""Caption 切分任务的 RESTful 提交、查询与健康检查路由。"""
+"""Caption 同步切分与健康检查路由。"""
 
 from __future__ import annotations
 
 from typing import cast
 
-from fastapi import APIRouter, HTTPException, Request, Response, status
+from fastapi import APIRouter, HTTPException, Request, status
 
-from caption_cut_service.schemas import CaptionCutRequest, CaptionCutSubmission, CaptionCutTask
-from caption_cut_service.services.jobs import CaptionCutJobs
+from caption_cut_service.schemas import CaptionCutRequest, CaptionCutResponse
+from caption_cut_service.services.caption import CaptionCutService
 
 router = APIRouter()
 caption_cuts = APIRouter(prefix="/api/caption-cuts", tags=["caption-cuts"])
 
 
-def _jobs(request: Request) -> CaptionCutJobs:
-    return cast(CaptionCutJobs, request.app.state.caption_cut_jobs)
+def _service(request: Request) -> CaptionCutService:
+    return cast(CaptionCutService, request.app.state.caption_cut_service)
 
 
 @router.get("/health", tags=["health"])
@@ -25,34 +25,22 @@ def health() -> dict[str, str]:
 
 @caption_cuts.post(
     "",
-    response_model=CaptionCutSubmission,
-    status_code=status.HTTP_202_ACCEPTED,
-    summary="提交 Caption 切分任务",
+    response_model=CaptionCutResponse,
+    summary="切分 Caption",
 )
-def create_caption_cut(payload: CaptionCutRequest, request: Request, response: Response) -> CaptionCutSubmission:
-    """登记请求并立即返回任务地址，处理工作由后台线程完成。"""
-    task = _jobs(request).submit(payload)
-    status_url = str(request.url_for("get_caption_cut", task_id=task.task_id))
-    response.headers["Location"] = status_url
-    return CaptionCutSubmission(
-        task_id=task.task_id,
-        status=task.status,
-        start_frame=task.start_frame,
-        end_frame=task.end_frame,
+def cut_caption(payload: CaptionCutRequest, request: Request) -> CaptionCutResponse:
+    """等待完整切分与上传完成，再直接返回业务结果。"""
+    try:
+        result = _service(request).cut(payload)
+    except (FileNotFoundError, ValueError) as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+    except (OSError, RuntimeError) as exc:
+        raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=str(exc)) from exc
+    return CaptionCutResponse(
+        start_frame=payload.start_frame,
+        end_frame=payload.end_frame,
+        result=result,
     )
-
-
-@caption_cuts.get(
-    "/{task_id}",
-    response_model=CaptionCutTask,
-    summary="查询 Caption 切分任务",
-)
-def get_caption_cut(task_id: str, request: Request) -> CaptionCutTask:
-    """返回请求范围、任务状态与成功后的实际切分结果。"""
-    task = _jobs(request).get(task_id)
-    if task is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Caption cut task not found")
-    return task
 
 
 router.include_router(caption_cuts)

@@ -12,7 +12,6 @@ from fastapi import FastAPI
 from caption_cut_service.api.routes import router
 from caption_cut_service.config import get_settings
 from caption_cut_service.services.caption import CaptionCutService
-from caption_cut_service.services.jobs import CaptionCutJobs
 from caption_cut_service.storage import OssStorage
 
 LOGGER = logging.getLogger(__name__)
@@ -20,17 +19,14 @@ LOGGER = logging.getLogger(__name__)
 
 @asynccontextmanager
 async def lifespan(application: FastAPI) -> AsyncIterator[None]:
-    """创建共享 OSS、切分与任务资源，并在停机时完成在途任务。"""
+    """创建同步请求共享的 OSS 与 Caption 切分服务。"""
     settings = get_settings()
-    settings.task_staging_dir.mkdir(parents=True, exist_ok=True)
-    cutter = CaptionCutService(settings, OssStorage(settings))
-    jobs = CaptionCutJobs(cutter, settings.worker_concurrency)
-    application.state.caption_cut_jobs = jobs
+    settings.staging_dir.mkdir(parents=True, exist_ok=True)
+    application.state.caption_cut_service = CaptionCutService(settings, OssStorage(settings))
     LOGGER.info("caption_cut_api_started version=%s", settings.app_version)
     try:
         yield
     finally:
-        jobs.close()
         LOGGER.info("caption_cut_api_stopped")
 
 
