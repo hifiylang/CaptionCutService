@@ -64,11 +64,12 @@ curl -i -X POST http://127.0.0.1:8010/api/caption-cuts \
 
 外层 `start_frame/end_frame` 原样返回请求值，`result.start_frame/end_frame` 是实际截取值。结果文件名固定为
 `<源视频名>_rich_caption_<请求 start_frame>_<请求 end_frame>.json`。输入或匹配错误返回 `400`，外部服务错误返回 `502`。
+接口接受或生成 `X-Request-ID`，并在成功和错误响应头中原样返回，便于关联日志。
 
 ## 配置与启动
 
-本地开发会优先读取本项目 `.env`；本项目没有 `.env` 时，会读取同级 `VideoCaptionService/.env` 中已有的
-OSS 与 Ark 凭证。部署环境应直接注入 `.env.example` 中的变量，不依赖同级目录。
+服务只读取本项目 `.env`，不再依赖同级目录。`.env.example` 包含服务地址、日志、OSS、Ark、重试和输入限制等全部配置；
+真实 `.env` 已写入本项目并由 Git 忽略，部署时也可以通过系统环境变量覆盖。
 
 ```bash
 make install-dev
@@ -83,3 +84,11 @@ docker compose up --build -d
 ```
 
 服务地址为 `http://127.0.0.1:8010`，OpenAPI 文档位于 `/docs`。上传过程使用 `data/staging/` 临时暂存，完成后自动清理。
+
+## 日志
+
+控制台统一输出单行 JSON。每次切分记录请求 ID、请求与实际帧范围、耗时、HTTP 状态和结果 OSS 地址，凭证字段自动脱敏。
+业务终态日志按 UTC 每日轮转并保留 30 份：
+
+- 成功：`data/logs/success/caption-cut-success.log`
+- 失败：`data/logs/failure/caption-cut-failure.log`

@@ -7,6 +7,8 @@
 - OSS SDK 调用只允许出现在 `storage/oss.py`；结果只允许写入
   `oss://ss-oss-intern/user/mengjun/CaptionCutService/`。
 - 凭证只从环境变量或未提交的 `.env` 读取，不得写入源码、日志、响应和提交记录。
+- 控制台日志使用单行 JSON；切分成功和失败事件分别写入 `data/logs/success/` 与 `data/logs/failure/`。
+- 每次切分使用 `X-Request-ID` 关联日志和响应，日志字段不得包含 AK/SK、Token 或 Authorization。
 
 ## Caption 规则
 

@@ -11,6 +11,7 @@ from fastapi import FastAPI
 
 from caption_cut_service.api.routes import router
 from caption_cut_service.config import get_settings
+from caption_cut_service.logging import configure_logging, log_event
 from caption_cut_service.services.caption import CaptionCutService
 from caption_cut_service.storage import OssStorage
 
@@ -23,17 +24,17 @@ async def lifespan(application: FastAPI) -> AsyncIterator[None]:
     settings = get_settings()
     settings.staging_dir.mkdir(parents=True, exist_ok=True)
     application.state.caption_cut_service = CaptionCutService(settings, OssStorage(settings))
-    LOGGER.info("caption_cut_api_started version=%s", settings.app_version)
+    log_event(LOGGER, "api_started", version=settings.app_version)
     try:
         yield
     finally:
-        LOGGER.info("caption_cut_api_stopped")
+        log_event(LOGGER, "api_stopped")
 
 
 def create_app() -> FastAPI:
     """按集中配置创建并装配 FastAPI 应用。"""
     settings = get_settings()
-    logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s %(message)s")
+    configure_logging(level=settings.log_level, log_dir=settings.log_dir)
     application = FastAPI(
         title=settings.app_name,
         version=settings.app_version,

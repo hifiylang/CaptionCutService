@@ -22,28 +22,39 @@ OSS_RETRY_ATTEMPTS = 5
 OSS_CONNECT_TIMEOUT_SECONDS = 15
 MAX_CAPTION_BYTES = 16 * 1024 * 1024
 MAX_CAPTION_CANDIDATES = 200
+LOG_LEVEL = "INFO"
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 DATA_DIR = PROJECT_ROOT / "data"
 PROMPT_PATH = PROJECT_ROOT / "config" / "prompts" / "global_summary.txt"
-_SECRET_ENV_NAMES = {
+LOG_DIR = DATA_DIR / "logs"
+_ENV_NAMES = {
+    "CAPTION_CUT_HOST",
+    "CAPTION_CUT_PORT",
+    "CAPTION_CUT_DATA_DIR",
+    "CAPTION_CUT_LOG_DIR",
+    "CAPTION_CUT_LOG_LEVEL",
     "OSS_ACCESS_KEY_ID",
     "OSS_ACCESS_KEY_SECRET",
     "OSS_SECURITY_TOKEN",
+    "OSS_ENDPOINT",
     "ARK_API_KEY",
+    "ARK_BASE_URL",
+    "ARK_MODEL",
+    "GLOBAL_TIMEOUT_SECONDS",
+    "GLOBAL_RETRY_ATTEMPTS",
+    "OSS_RETRY_ATTEMPTS",
+    "OSS_CONNECT_TIMEOUT_SECONDS",
+    "MAX_CAPTION_BYTES",
+    "MAX_CAPTION_CANDIDATES",
 }
 
 
 def load_environment() -> None:
-    """加载本项目凭证；本地开发时可复用同级 VideoCaptionService 的 `.env`。"""
+    """只加载本项目 `.env` 中声明支持的配置与凭证。"""
     configured = os.environ.get("CAPTION_CUT_ENV_FILE")
-    candidates = (
-        [Path(configured)]
-        if configured
-        else [PROJECT_ROOT / ".env", PROJECT_ROOT.parent / "VideoCaptionService" / ".env"]
-    )
-    path = next((item for item in candidates if item.is_file()), None)
-    if path is None:
+    path = Path(configured) if configured else PROJECT_ROOT / ".env"
+    if not path.is_file():
         return
     for raw_line in path.read_text(encoding="utf-8").splitlines():
         line = raw_line.strip()
@@ -51,8 +62,29 @@ def load_environment() -> None:
             continue
         key, separator, value = line.partition("=")
         name = key.strip()
-        if separator and name in _SECRET_ENV_NAMES:
+        if separator and name in _ENV_NAMES:
             os.environ.setdefault(name, value.strip().strip("\"'"))
+
+
+def _env_int(name: str, default: int) -> int:
+    raw = os.environ.get(name)
+    if raw is None:
+        return default
+    try:
+        value = int(raw)
+    except ValueError as exc:
+        raise ValueError(f"{name} must be an integer") from exc
+    if value <= 0:
+        raise ValueError(f"{name} must be greater than zero")
+    return value
+
+
+def _env_path(name: str, default: Path) -> Path:
+    raw = os.environ.get(name)
+    if not raw:
+        return default
+    path = Path(raw)
+    return path if path.is_absolute() else PROJECT_ROOT / path
 
 
 @dataclass(frozen=True)
@@ -79,6 +111,8 @@ class Settings:
     oss_connect_timeout_seconds: int = OSS_CONNECT_TIMEOUT_SECONDS
     max_caption_bytes: int = MAX_CAPTION_BYTES
     max_caption_candidates: int = MAX_CAPTION_CANDIDATES
+    log_level: str = LOG_LEVEL
+    log_dir: Path = LOG_DIR
 
     @property
     def staging_dir(self) -> Path:
@@ -90,11 +124,26 @@ class Settings:
 def get_settings() -> Settings:
     """组合固定配置与环境注入的凭证，并检查写入边界。"""
     load_environment()
+    data_dir = _env_path("CAPTION_CUT_DATA_DIR", DATA_DIR)
     settings = Settings(
+        host=os.environ.get("CAPTION_CUT_HOST", APP_HOST),
+        port=_env_int("CAPTION_CUT_PORT", APP_PORT),
+        data_dir=data_dir,
+        oss_endpoint=os.environ.get("OSS_ENDPOINT", OSS_ENDPOINT),
         oss_access_key_id=os.environ.get("OSS_ACCESS_KEY_ID") or None,
         oss_access_key_secret=os.environ.get("OSS_ACCESS_KEY_SECRET") or None,
         oss_security_token=os.environ.get("OSS_SECURITY_TOKEN") or None,
         ark_api_key=os.environ.get("ARK_API_KEY") or None,
+        ark_base_url=os.environ.get("ARK_BASE_URL", ARK_BASE_URL),
+        ark_model=os.environ.get("ARK_MODEL", ARK_MODEL),
+        global_timeout_seconds=_env_int("GLOBAL_TIMEOUT_SECONDS", GLOBAL_TIMEOUT_SECONDS),
+        global_retry_attempts=_env_int("GLOBAL_RETRY_ATTEMPTS", GLOBAL_RETRY_ATTEMPTS),
+        oss_retry_attempts=_env_int("OSS_RETRY_ATTEMPTS", OSS_RETRY_ATTEMPTS),
+        oss_connect_timeout_seconds=_env_int("OSS_CONNECT_TIMEOUT_SECONDS", OSS_CONNECT_TIMEOUT_SECONDS),
+        max_caption_bytes=_env_int("MAX_CAPTION_BYTES", MAX_CAPTION_BYTES),
+        max_caption_candidates=_env_int("MAX_CAPTION_CANDIDATES", MAX_CAPTION_CANDIDATES),
+        log_level=os.environ.get("CAPTION_CUT_LOG_LEVEL", LOG_LEVEL).upper(),
+        log_dir=_env_path("CAPTION_CUT_LOG_DIR", data_dir / "logs"),
     )
     parsed = urlparse(settings.output_oss_prefix)
     if parsed.scheme != "oss" or parsed.netloc != "ss-oss-intern":

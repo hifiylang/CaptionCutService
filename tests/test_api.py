@@ -54,6 +54,7 @@ class ApiContractTest(unittest.TestCase):
             app.state.caption_cut_service = service
             response = client.post(
                 "/api/caption-cuts",
+                headers={"X-Request-ID": "request-success"},
                 json={
                     "start_frame": 1,
                     "end_frame": 2,
@@ -62,6 +63,7 @@ class ApiContractTest(unittest.TestCase):
             )
 
         self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.headers["X-Request-ID"], "request-success")
         self.assertEqual(
             response.json(),
             {
@@ -75,6 +77,26 @@ class ApiContractTest(unittest.TestCase):
                 },
             },
         )
+
+    def test_post_returns_correlated_failure(self) -> None:
+        service = MagicMock()
+        service.cut.side_effect = ValueError("caption does not match")
+
+        with TestClient(app, raise_server_exceptions=True) as client:
+            app.state.caption_cut_service = service
+            response = client.post(
+                "/api/caption-cuts",
+                headers={"X-Request-ID": "request-failure"},
+                json={
+                    "start_frame": 1,
+                    "end_frame": 2,
+                    "source_oss_uri": "oss://source/video.mp4",
+                },
+            )
+
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(response.headers["X-Request-ID"], "request-failure")
+        self.assertEqual(response.json(), {"detail": "caption does not match"})
 
 
 if __name__ == "__main__":
