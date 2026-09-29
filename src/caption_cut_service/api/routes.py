@@ -34,7 +34,12 @@ def create_caption_cut(payload: CaptionCutRequest, request: Request, response: R
     task = _jobs(request).submit(payload)
     status_url = str(request.url_for("get_caption_cut", task_id=task.task_id))
     response.headers["Location"] = status_url
-    return CaptionCutSubmission(task_id=task.task_id, status=task.status)
+    return CaptionCutSubmission(
+        task_id=task.task_id,
+        status=task.status,
+        start_frame=task.start_frame,
+        end_frame=task.end_frame,
+    )
 
 
 @caption_cuts.get(
@@ -43,7 +48,7 @@ def create_caption_cut(payload: CaptionCutRequest, request: Request, response: R
     summary="查询 Caption 切分任务",
 )
 def get_caption_cut(task_id: str, request: Request) -> CaptionCutTask:
-    """返回任务当前状态与成功后的结果 OSS 地址。"""
+    """返回请求范围、任务状态与成功后的实际切分结果。"""
     task = _jobs(request).get(task_id)
     if task is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Caption cut task not found")

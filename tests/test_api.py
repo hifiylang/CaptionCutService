@@ -25,13 +25,20 @@ class ApiContractTest(unittest.TestCase):
             {"start_frame", "end_frame", "source_oss_uri"},
         )
         submission_schema = openapi["components"]["schemas"]["CaptionCutSubmission"]
-        self.assertEqual(set(submission_schema["properties"]), {"task_id", "status"})
+        self.assertEqual(
+            set(submission_schema["properties"]),
+            {"task_id", "status", "start_frame", "end_frame"},
+        )
         task_schema = openapi["components"]["schemas"]["CaptionCutTask"]
         self.assertEqual(
             set(task_schema["properties"]),
-            {"task_id", "status", "source_video_oss_uri", "result_oss_uri", "error"},
+            {"task_id", "status", "start_frame", "end_frame", "result", "error"},
         )
-        self.assertNotIn("CaptionCutResult", openapi["components"]["schemas"])
+        result_schema = openapi["components"]["schemas"]["CaptionCutResult"]
+        self.assertEqual(
+            set(result_schema["properties"]),
+            {"source_video_oss_uri", "result_oss_uri", "start_frame", "end_frame"},
+        )
         self.assertNotIn("/api/v1/caption-cuts", paths)
 
 

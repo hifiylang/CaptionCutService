@@ -12,7 +12,7 @@ from typing import Any, Protocol
 import requests
 
 from caption_cut_service.config import Settings
-from caption_cut_service.schemas import CaptionCutRequest
+from caption_cut_service.schemas import CaptionCutRequest, CaptionCutResult
 from caption_cut_service.storage import OssStorage
 
 OUTCOMES = {
@@ -188,8 +188,8 @@ class CaptionCutService:
         self.storage = storage
         self.summarizer = summarizer or ArkGlobalSummarizer(settings)
 
-    def cut(self, request: CaptionCutRequest, task_id: str) -> tuple[str, str]:
-        """完成发现、边界扩展、Global 重建与上传，并返回源视频和结果 URI。"""
+    def cut(self, request: CaptionCutRequest, task_id: str) -> CaptionCutResult:
+        """完成切分与上传，并返回来源、交付地址和实际切分范围。"""
         caption = self._find_caption(request.source_oss_uri)
         source_video_oss_uri = caption.get("video_oss_uri")
         if not isinstance(source_video_oss_uri, str) or not source_video_oss_uri.startswith("oss://"):
@@ -198,7 +198,7 @@ class CaptionCutService:
             source_video_oss_uri = request.source_oss_uri
         requested_start = float(request.start_frame)
         requested_end = float(request.end_frame)
-        selected, _, _ = select_segments(
+        selected, expanded_start, expanded_end = select_segments(
             caption.get("segments"),
             requested_start=requested_start,
             requested_end=requested_end,
@@ -222,7 +222,12 @@ class CaptionCutService:
         result_uri = f"{self.settings.output_oss_prefix}/{result_name}"
         staging_path = self.settings.task_staging_dir / task_id / "result.json"
         self.storage.upload_json(result, result_uri, staging_path)
-        return source_video_oss_uri, result_uri
+        return CaptionCutResult(
+            source_video_oss_uri=source_video_oss_uri,
+            result_oss_uri=result_uri,
+            start_frame=math.floor(expanded_start),
+            end_frame=math.ceil(expanded_end),
+        )
 
     def _find_caption(self, uri: str) -> dict[str, Any]:
         """优先读取确定性文件名，再用 video_oss_uri 消除同目录多候选歧义。"""

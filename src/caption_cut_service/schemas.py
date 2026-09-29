@@ -40,13 +40,25 @@ class CaptionCutSubmission(BaseModel):
 
     task_id: str
     status: JobStatus
+    start_frame: int
+    end_frame: int
+
+
+class CaptionCutResult(BaseModel):
+    """成功任务的来源、交付地址与实际切分范围。"""
+
+    source_video_oss_uri: str
+    result_oss_uri: str
+    start_frame: int
+    end_frame: int
 
 
 class CaptionCutTask(BaseModel):
-    """任务查询响应；成功时只返回最终 OSS 地址。"""
+    """任务查询响应；成功时在 result 中返回实际切分结果。"""
 
     task_id: str
     status: JobStatus
-    source_video_oss_uri: str | None = None
-    result_oss_uri: str | None = None
+    start_frame: int
+    end_frame: int
+    result: CaptionCutResult | None = None
     error: str | None = None

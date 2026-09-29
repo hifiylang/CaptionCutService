@@ -55,7 +55,9 @@ curl -i -X POST http://127.0.0.1:8010/api/caption-cuts \
 ```json
 {
   "task_id": "7fdb...",
-  "status": "queued"
+  "status": "queued",
+  "start_frame": 300,
+  "end_frame": 900
 }
 ```
 
@@ -67,8 +69,26 @@ curl -i -X POST http://127.0.0.1:8010/api/caption-cuts \
 curl http://127.0.0.1:8010/api/caption-cuts/7fdb...
 ```
 
-成功后返回 `source_video_oss_uri` 和 `result_oss_uri`；结果文件名固定为
-`<task_id>_rich_caption_<start_frame>_<end_frame>.json`。失败后的 `error` 保存可对外定位的错误，不包含密钥或 Token。
+成功后返回请求范围和按 segment 边界扩展后的实际切分范围：
+
+```json
+{
+  "task_id": "7fdb...",
+  "status": "succeeded",
+  "start_frame": 300,
+  "end_frame": 900,
+  "result": {
+    "source_video_oss_uri": "oss://bucket/path/video.mp4",
+    "result_oss_uri": "oss://ss-oss-intern/user/mengjun/CaptionCutService/7fdb..._rich_caption_300_900.json",
+    "start_frame": 280,
+    "end_frame": 920
+  },
+  "error": null
+}
+```
+
+外层 `start_frame/end_frame` 原样返回请求值，`result.start_frame/end_frame` 是实际截取值。结果文件名固定为
+`<task_id>_rich_caption_<请求 start_frame>_<请求 end_frame>.json`。失败后的 `error` 保存可对外定位的错误，不包含密钥或 Token。
 
 ## 配置与启动
 

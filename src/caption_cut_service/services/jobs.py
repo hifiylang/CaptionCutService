@@ -32,6 +32,8 @@ class CaptionCutJobs:
             task = CaptionCutTask(
                 task_id=task_id,
                 status=JobStatus.QUEUED,
+                start_frame=request.start_frame,
+                end_frame=request.end_frame,
             )
             # ponytail: 任务历史只保留到进程退出；高吞吐运行时再增加 TTL 清理。
             self.tasks[task_id] = task
@@ -52,7 +54,7 @@ class CaptionCutJobs:
     def _run(self, task_id: str, request: CaptionCutRequest) -> None:
         self._update(task_id, status=JobStatus.RUNNING, error=None)
         try:
-            source_video_oss_uri, result_oss_uri = self.cutter.cut(request, task_id)
+            result = self.cutter.cut(request, task_id)
         except Exception as exc:  # noqa: BLE001 - 后台异常必须转换为可查询的失败状态
             LOGGER.exception("caption_cut_failed task_id=%s error_type=%s", task_id, type(exc).__name__)
             self._update(task_id, status=JobStatus.FAILED, error=str(exc)[:1000])
@@ -60,8 +62,7 @@ class CaptionCutJobs:
         self._update(
             task_id,
             status=JobStatus.SUCCEEDED,
-            source_video_oss_uri=source_video_oss_uri,
-            result_oss_uri=result_oss_uri,
+            result=result,
         )
 
     def close(self) -> None:
