@@ -13,7 +13,7 @@ from urllib.parse import urlparse
 import requests
 
 from caption_cut_service.config import Settings
-from caption_cut_service.schemas import CaptionCutRequest
+from caption_cut_service.schemas import CaptionCutRequest, CaptionCutResult
 from caption_cut_service.storage import OssStorage
 
 OUTCOMES = {
@@ -189,18 +189,18 @@ class CaptionCutService:
         self.storage = storage
         self.summarizer = summarizer or ArkGlobalSummarizer(settings)
 
-    def cut(self, request: CaptionCutRequest, task_id: str) -> dict[str, Any]:
+    def cut(self, request: CaptionCutRequest, task_id: str) -> CaptionCutResult:
         """完成发现、边界扩展、Global 重建、上传，并返回查询元数据。"""
-        caption_uri, caption = self._find_caption(request.osspath)
+        caption_uri, caption = self._find_caption(request.source_oss_uri)
         source_video_uri = caption.get("video_oss_uri")
         if not isinstance(source_video_uri, str) or not source_video_uri.startswith("oss://"):
-            if request.osspath.lower().endswith(".json") or request.osspath.endswith("/"):
+            if request.source_oss_uri.lower().endswith(".json") or request.source_oss_uri.endswith("/"):
                 raise ValueError("Caption JSON must contain video_oss_uri for FPS probing")
-            source_video_uri = request.osspath
+            source_video_uri = request.source_oss_uri
 
         fps = self.storage.probe_video_fps(source_video_uri)
-        requested_start = request.startframe / fps
-        requested_end = request.endframe / fps
+        requested_start = request.start_frame / fps
+        requested_end = request.end_frame / fps
         selected, expanded_start, expanded_end = select_segments(
             caption.get("segments"),
             requested_start=requested_start,
@@ -222,21 +222,21 @@ class CaptionCutService:
         result = {"scene": copy.deepcopy(source_scene), "task": task, "segments": selected}
 
         source_name = PurePosixPath(urlparse(source_video_uri).path).stem or "caption"
-        output_name = f"{source_name}_{request.startframe}_{request.endframe}_{task_id}_rich_caption.json"
+        output_name = f"{source_name}_{request.start_frame}_{request.end_frame}_{task_id}_rich_caption.json"
         result_uri = f"{self.settings.output_oss_prefix}/{output_name}"
         staging_path = self.settings.task_staging_dir / task_id / "result.json"
         self.storage.upload_json(result, result_uri, staging_path)
-        return {
-            "result_oss_uri": result_uri,
-            "source_caption_oss_uri": caption_uri,
-            "source_video_oss_uri": source_video_uri,
-            "source_fps": round(fps, 6),
-            "requested_startframe": request.startframe,
-            "requested_endframe": request.endframe,
-            "expanded_startframe": round(expanded_start * fps),
-            "expanded_endframe": round(expanded_end * fps),
-            "segment_count": len(selected),
-        }
+        return CaptionCutResult(
+            result_oss_uri=result_uri,
+            source_caption_oss_uri=caption_uri,
+            source_video_oss_uri=source_video_uri,
+            source_fps=round(fps, 6),
+            requested_start_frame=request.start_frame,
+            requested_end_frame=request.end_frame,
+            expanded_start_frame=round(expanded_start * fps),
+            expanded_end_frame=round(expanded_end * fps),
+            segment_count=len(selected),
+        )
 
     def _find_caption(self, uri: str) -> tuple[str, dict[str, Any]]:
         """优先读取确定性文件名，再用 video_oss_uri 消除同目录多候选歧义。"""

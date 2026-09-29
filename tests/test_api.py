@@ -11,12 +11,20 @@ class ApiContractTest(unittest.TestCase):
     """检查提交与查询端点的 OpenAPI 协议。"""
 
     def test_openapi_contains_async_caption_cut_routes(self) -> None:
-        paths = app.openapi()["paths"]
+        openapi = app.openapi()
+        paths = openapi["paths"]
 
         self.assertEqual(
-            paths["/caption-cuts"]["post"]["responses"].get("202", {}).get("description"), "Successful Response"
+            paths["/api/caption-cuts"]["post"]["responses"].get("202", {}).get("description"),
+            "Successful Response",
         )
-        self.assertIn("get", paths["/caption-cuts/{task_id}"])
+        self.assertIn("get", paths["/api/caption-cuts/{task_id}"])
+        request_schema = openapi["components"]["schemas"]["CaptionCutRequest"]
+        self.assertEqual(
+            set(request_schema["required"]),
+            {"start_frame", "end_frame", "source_oss_uri"},
+        )
+        self.assertNotIn("/api/v1/caption-cuts", paths)
 
 
 if __name__ == "__main__":

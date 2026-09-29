@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
+from datetime import datetime
 from enum import StrEnum
-from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
@@ -22,17 +22,17 @@ class CaptionCutRequest(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
 
-    startframe: int = Field(ge=0, description="切分起始帧，包含该帧")
-    endframe: int = Field(gt=0, description="切分结束帧，按右开区间处理")
-    osspath: str = Field(min_length=1, description="源视频、rich caption 或其所在 OSS 目录")
+    start_frame: int = Field(ge=0, description="切分起始帧，包含该帧")
+    end_frame: int = Field(gt=0, description="切分结束帧，按右开区间处理")
+    source_oss_uri: str = Field(min_length=1, description="源视频、rich caption 或其所在 OSS 目录 URI")
 
     @model_validator(mode="after")
     def validate_frame_range(self):
         """拒绝空区间，避免 segment 边界匹配产生歧义。"""
-        if self.endframe <= self.startframe:
-            raise ValueError("endframe must be greater than startframe")
-        if not self.osspath.startswith("oss://"):
-            raise ValueError("osspath must be an oss:// URI")
+        if self.end_frame <= self.start_frame:
+            raise ValueError("end_frame must be greater than start_frame")
+        if not self.source_oss_uri.startswith("oss://"):
+            raise ValueError("source_oss_uri must be an oss:// URI")
         return self
 
 
@@ -44,12 +44,28 @@ class CaptionCutSubmission(BaseModel):
     status_url: str
 
 
+class CaptionCutResult(BaseModel):
+    """成功任务返回的来源、交付地址和实际切分边界。"""
+
+    model_config = ConfigDict(extra="forbid")
+
+    result_oss_uri: str
+    source_caption_oss_uri: str
+    source_video_oss_uri: str
+    source_fps: float = Field(gt=0)
+    requested_start_frame: int = Field(ge=0)
+    requested_end_frame: int = Field(gt=0)
+    expanded_start_frame: int = Field(ge=0)
+    expanded_end_frame: int = Field(gt=0)
+    segment_count: int = Field(gt=0)
+
+
 class CaptionCutTask(BaseModel):
     """任务查询响应；成功时 result 保存 OSS 地址与实际扩展边界。"""
 
     task_id: str
     status: JobStatus
-    result: dict[str, Any] | None = None
+    result: CaptionCutResult | None = None
     error: str | None = None
-    created_at: str
-    updated_at: str
+    created_at: datetime
+    updated_at: datetime

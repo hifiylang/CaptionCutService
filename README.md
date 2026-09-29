@@ -1,6 +1,6 @@
 # CaptionCutService
 
-基于 FastAPI 的常驻 rich caption 切分服务。调用方提交 `startframe`、`endframe`、`osspath` 后立即获得
+基于 FastAPI 的常驻 rich caption 切分服务。调用方提交 `start_frame`、`end_frame`、`source_oss_uri` 后立即获得
 `202 Accepted` 和 `task_id`；后台通过 OSS 内网读取源 rich caption，按 segment 边界扩展范围，重新生成当前片段的
 Global task 信息，并把新 JSON 上传到：
 
@@ -11,7 +11,7 @@ oss://ss-oss-intern/user/mengjun/CaptionCutService/
 ## 处理流程
 
 ```text
-POST /caption-cuts
+POST /api/caption-cuts
   -> 进程内登记 queued
   -> 202 + task_id
   -> 定位源 rich caption
@@ -24,13 +24,13 @@ POST /caption-cuts
   -> Ark 根据所选 segments 重写 task.command/task.step/outcome
   -> 保留源 scene 与 task.domain/type，拼接所选 segments
   -> 本机原子写入并上传固定 OSS 前缀
-  -> GET /caption-cuts/{task_id} 返回结果地址和实际边界
+  -> GET /api/caption-cuts/{task_id} 返回结果地址和实际边界
 ```
 
-`startframe` 包含，`endframe` 按右开区间处理，即 `[startframe, endframe)`。segment 使用区间相交规则，边界
+`start_frame` 包含，`end_frame` 按右开区间处理，即 `[start_frame, end_frame)`。segment 使用区间相交规则，边界
 刚好相等时不会额外包含相邻 segment。输出 segments 保留原有内容，只调整 `start_time/end_time` 使首段从 0 开始。
 
-`osspath` 支持三种形式：
+`source_oss_uri` 支持三种形式：
 
 - 源视频 OSS URI：优先寻找同目录 `<视频文件名 stem>_rich_caption.json`，再按 `video_oss_uri` 匹配。
 - rich caption JSON URI：直接读取，但 JSON 必须包含 `video_oss_uri`，用于探测真实 FPS。
@@ -41,12 +41,12 @@ POST /caption-cuts
 提交任务：
 
 ```bash
-curl -i -X POST http://127.0.0.1:8010/caption-cuts \
+curl -i -X POST http://127.0.0.1:8010/api/caption-cuts \
   -H 'Content-Type: application/json' \
   -d '{
-    "startframe": 300,
-    "endframe": 900,
-    "osspath": "oss://bucket/path/video.mp4"
+    "start_frame": 300,
+    "end_frame": 900,
+    "source_oss_uri": "oss://bucket/path/video.mp4"
   }'
 ```
 
@@ -56,14 +56,14 @@ curl -i -X POST http://127.0.0.1:8010/caption-cuts \
 {
   "task_id": "7fdb...",
   "status": "queued",
-  "status_url": "http://127.0.0.1:8010/caption-cuts/7fdb..."
+  "status_url": "http://127.0.0.1:8010/api/caption-cuts/7fdb..."
 }
 ```
 
 查询任务：
 
 ```bash
-curl http://127.0.0.1:8010/caption-cuts/7fdb...
+curl http://127.0.0.1:8010/api/caption-cuts/7fdb...
 ```
 
 成功后的 `result` 包含 `result_oss_uri`、源 caption/video URI、源 FPS、请求帧范围、扩展后的实际帧范围和

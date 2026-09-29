@@ -10,6 +10,7 @@ from caption_cut_service.schemas import CaptionCutRequest, CaptionCutSubmission,
 from caption_cut_service.services.jobs import CaptionCutJobs
 
 router = APIRouter()
+caption_cuts = APIRouter(prefix="/api/caption-cuts", tags=["caption-cuts"])
 
 
 def _jobs(request: Request) -> CaptionCutJobs:
@@ -22,11 +23,10 @@ def health() -> dict[str, str]:
     return {"status": "ok"}
 
 
-@router.post(
-    "/caption-cuts",
+@caption_cuts.post(
+    "",
     response_model=CaptionCutSubmission,
     status_code=status.HTTP_202_ACCEPTED,
-    tags=["caption-cuts"],
     summary="提交 Caption 切分任务",
 )
 def create_caption_cut(payload: CaptionCutRequest, request: Request, response: Response) -> CaptionCutSubmission:
@@ -37,10 +37,9 @@ def create_caption_cut(payload: CaptionCutRequest, request: Request, response: R
     return CaptionCutSubmission(task_id=task.task_id, status=task.status, status_url=status_url)
 
 
-@router.get(
-    "/caption-cuts/{task_id}",
+@caption_cuts.get(
+    "/{task_id}",
     response_model=CaptionCutTask,
-    tags=["caption-cuts"],
     summary="查询 Caption 切分任务",
 )
 def get_caption_cut(task_id: str, request: Request) -> CaptionCutTask:
@@ -49,3 +48,6 @@ def get_caption_cut(task_id: str, request: Request) -> CaptionCutTask:
     if task is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Caption cut task not found")
     return task
+
+
+router.include_router(caption_cuts)

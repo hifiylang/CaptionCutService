@@ -10,7 +10,7 @@
 
 ## Caption 规则
 
-- 外部帧范围为 `[startframe, endframe)`，必须使用源视频真实 FPS 换算时间，禁止写死帧率。
+- 外部帧范围为 `[start_frame, end_frame)`，必须使用源视频真实 FPS 换算时间，禁止写死帧率。
 - segment 采用区间相交规则；输出范围前扩到首段起点、后扩到末段终点。
 - 输出 segments 保留源字段，只把时间重置到首段从 0 秒开始。
 - Global 只重新生成 `task.command`、`task.step` 和可选 `task.outcome`；`scene`、`task.domain/type` 保留源值。

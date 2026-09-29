@@ -14,8 +14,8 @@ from caption_cut_service.services.caption import CaptionCutService
 LOGGER = logging.getLogger(__name__)
 
 
-def _now() -> str:
-    return datetime.now(UTC).isoformat()
+def _now() -> datetime:
+    return datetime.now(UTC)
 
 
 class CaptionCutJobs:
