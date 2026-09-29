@@ -1,0 +1,11 @@
+services:
+  api:
+    build: .
+    env_file:
+      - path: .env
+        required: false
+    ports:
+      - "8010:8010"
+    volumes:
+      - ./data:/app/data
+    restart: unless-stopped

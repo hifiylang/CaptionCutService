@@ -1,0 +1,49 @@
+[build-system]
+requires = ["setuptools>=75", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "caption-cut-service"
+version = "0.1.0"
+description = "FastAPI service for cutting rich caption JSON by video frames"
+readme = "README.md"
+requires-python = ">=3.11"
+classifiers = [
+  "Framework :: FastAPI",
+  "Programming Language :: Python :: 3",
+  "Typing :: Typed",
+]
+dependencies = [
+  "fastapi>=0.115,<1.0",
+  "uvicorn[standard]>=0.34,<1.0",
+  "requests>=2.32,<3.0",
+  "oss2>=2.19,<3.0",
+]
+
+[project.optional-dependencies]
+dev = ["ruff>=0.9,<1.0"]
+
+[project.scripts]
+caption-cut-api = "caption_cut_service.main:main"
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+
+[tool.setuptools.packages.find]
+where = ["src"]
+include = ["caption_cut_service*"]
+
+[tool.setuptools.package-data]
+caption_cut_service = ["py.typed"]
+
+[tool.ruff]
+line-length = 120
+target-version = "py311"
+src = ["src"]
+
+[tool.ruff.lint]
+select = ["B", "C4", "E", "F", "I", "PIE", "RET", "RSE", "SIM", "TID", "UP"]
+
+[tool.ruff.format]
+docstring-code-format = true
+quote-style = "double"
